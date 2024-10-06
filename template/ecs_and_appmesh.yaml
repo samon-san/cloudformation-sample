@@ -1,0 +1,69 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::LanguageExtensions
+Description: Create ECS and Appmesh Resources
+
+Parameters:
+  Env: 
+    Description: Environment (dev,stg,prod etc)
+    Type: String
+  System:
+    Description: System ID
+    Type: String 
+
+
+
+#--------------------------------------------------------------------------
+# Resources
+#--------------------------------------------------------------------------
+Resources:
+
+  #--------------------------------------------------------------------------
+  # ECS Cluster
+  #--------------------------------------------------------------------------
+
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Sub ${ENV}-${System}-cluster
+      ClusterSettings:
+        - Name: containerInsights
+          Value: enabled
+      ServiceConnectDefaults:
+        Namespace: !Sub ${System}.sc.local
+      Tags:
+        - Key: Name
+          Value: !Sub ${ENV}-${System}-cluster
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+  # #--------------------------------------------------------------------------
+  # # ServiceDiscovery
+  # #--------------------------------------------------------------------------
+
+  # ServiceDiscovery:
+  #   Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+  #   Properties:
+  #     Vpc: {"Fn::ImportValue": !Sub "${System}VPCId"}
+  #     Name: !Sub ${System}.local
+
+
+#--------------------------------------------------------------------------
+# Output
+#--------------------------------------------------------------------------
+
+Outputs:
+  ECSClusterName:
+    Value: !Ref ECSCluster
+    Export:
+      Name: !Sub ${System}ECSClusterName
+
+  # 'Fn::ForEach::ServiceDiscoveryOutput'
+  #   - Property
+  #   - [Arn, HostedZoneId, Id]
+  #   - 'ServiceDiscovery${Property}'
+  #       Value: !GetAtt [ServiceDiscovery, !Ref Property]
+  #       Export:
+  #         Name: !Sub ${System}ServiceDiscovery${Property}
+

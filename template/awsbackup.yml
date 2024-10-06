@@ -1,0 +1,149 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: |
+  awsbackup
+
+Parameters:
+  Env: 
+    Description: Environment (dev,stg,prod etc)
+    Type: String
+
+  System:
+    Description: System ID
+    Type: String 
+
+  MoveToColdStorageAfterDays:
+    Description: Warm Storage Days
+    Type: Number 
+
+  DeleteAfterDays:
+    Description: Total Retention Days
+    Type: Number 
+
+
+  ScheduleExpression:
+    Description: Execution Schedule
+    Type: String 
+
+  DestinationRegion:
+    Description: The region to copy the backup to
+    Type: String 
+
+
+Resources:
+
+# -------------------------------------------------------- #
+# IAM
+# -------------------------------------------------------- #
+
+  IAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      Path: /service-role/
+      RoleName: AWSBackupDefaultServiceRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement: 
+          - Effect: Allow
+            Principal: 
+              Service: backup.amazonaws.com
+            Action: sts:AssumeRole
+      MaxSessionDuration: 3600
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForRestores"
+        - "arn:aws:iam::aws:policy/service-role/AWSBackupServiceRolePolicyForBackup"
+      Description: "Provides AWS Backup permission to create backups and perform restores on your behalf across AWS services test"
+
+# -------------------------------------------------------- #
+# AWS backup
+# -------------------------------------------------------- #
+
+  BackupBackupVault:
+    Type: AWS::Backup::BackupVault
+    Properties:
+      BackupVaultName: !Sub ${Env}-${System}-backup-vault
+      BackupVaultTags: 
+        Env: !Ref Env
+        System: !Ref System
+        Region: !Ref AWS::Region
+
+  BackupBackupPlan:
+    Type: AWS::Backup::BackupPlan
+    Properties:
+      BackupPlan:
+        BackupPlanName: !Sub ${Env}-${System}-backup-plan
+        BackupPlanRule:
+          - CompletionWindowMinutes: 240
+            Lifecycle:
+              MoveToColdStorageAfterDays: !Ref MoveToColdStorageAfterDays
+              DeleteAfterDays: !Ref DeleteAfterDays
+            RecoveryPointTags:
+              Recovery: true
+            RuleName: !Sub ${Env}-${System}-backup-rule
+            ScheduleExpression: !Ref ScheduleExpression
+            StartWindowMinutes: 60
+            TargetBackupVault: !Ref BackupBackupVault
+            CopyActions:
+              - DestinationBackupVaultArn: !Sub arn:aws:backup:${DestinationRegion}:${AWS::AccountId}:backup-vault:${Env}-${System}-backup-vault
+                Lifecycle:
+                  MoveToColdStorageAfterDays: !Ref MoveToColdStorageAfterDays
+                  DeleteAfterDays: !Ref DeleteAfterDays
+      BackupPlanTags: 
+        Env: !Ref Env
+        System: !Ref System
+
+  BackupBackupSelectionCloudformation:
+    Type: AWS::Backup::BackupSelection
+    Properties:
+      BackupPlanId: !Ref BackupBackupPlan
+      BackupSelection:
+        SelectionName: !Sub ${Env}-${System}-backup-cloudformation
+        IamRoleArn: !GetAtt IAMRole.Arn
+        Resources:
+          - arn:aws:cloudformation:*:*:stack/*
+        Conditions:
+          StringEquals:
+            - ConditionKey: aws:ResourceTag/backup
+              ConditionValue: true
+
+  BackupBackupSelectionEC2:
+    Type: AWS::Backup::BackupSelection
+    Properties:
+      BackupPlanId: !Ref BackupBackupPlan
+      BackupSelection:
+        SelectionName: !Sub ${Env}-${System}-backup-ec2
+        IamRoleArn: !GetAtt IAMRole.Arn
+        Resources:
+          - arn:aws:ec2:*:*:instance/*
+        Conditions:
+          StringEquals:
+            - ConditionKey: aws:ResourceTag/backup
+              ConditionValue: true
+
+  BackupBackupSelectionRDS:
+    Type: AWS::Backup::BackupSelection
+    Properties:
+      BackupPlanId: !Ref BackupBackupPlan
+      BackupSelection:
+        SelectionName: !Sub ${Env}-${System}-backup-rds
+        IamRoleArn: !GetAtt IAMRole.Arn
+        Resources:
+          - arn:aws:rds:*:*:cluster:*
+        Conditions:
+          StringEquals:
+            - ConditionKey: aws:ResourceTag/backup
+              ConditionValue: true
+
+  BackupBackupSelectionS3:
+    Type: AWS::Backup::BackupSelection
+    Properties:
+      BackupPlanId: !Ref BackupBackupPlan
+      BackupSelection:
+        SelectionName: !Sub ${Env}-${System}-backup-s3
+        IamRoleArn: !GetAtt IAMRole.Arn
+        Resources:
+          - arn:aws:s3:::*
+        Conditions:
+          StringEquals:
+            - ConditionKey: aws:ResourceTag/backup
+              ConditionValue: true

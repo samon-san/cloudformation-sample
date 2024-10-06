@@ -1,0 +1,113 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create VPC
+
+Parameters:
+  Env: 
+    Description: Environment (dev,stg,prod etc)
+    Type: String
+  System:
+    Description: System ID
+    Type: String 
+  VPCCidr:
+    Desciption: VPC IP Range
+    Type: String
+
+
+#--------------------------------------------------------------------------
+# Resources
+#--------------------------------------------------------------------------
+Resources:
+
+  #--------------------------------------------------------------------------
+  # VPC
+  #--------------------------------------------------------------------------
+
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock : !Ref VPCCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-vpc
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+  VPCFlowLogs:
+    Type: AWS::EC2::FlowLog
+    Properties:
+      TrafficType: All
+      LogDestinationType: s3
+      LogDestination: {"Fn::ImportValue": !Sub "LogBacketArn"}
+      ResourceType: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-vpc-flowlog
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+  #--------------------------------------------------------------------------
+  # InternetGateway
+  #--------------------------------------------------------------------------
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-igw
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+#--------------------------------------------------------------------------
+# Output
+#--------------------------------------------------------------------------
+
+Outputs:
+  VPCId:
+    Value: !Ref VPC
+    Export:
+      Name: ${System}VPCId
+
+  VPCCidrBlock:
+    Value: !GetAtt [VPC, CidrBlock]
+    Export:
+      Name: ${System}VPCCidrBlock
+
+  InternetGatewayId:
+    Value: !Ref InternetGateway
+    Export:
+      Name: ${System}InternetGatewayId
+
+
+
+  'Fn::ForEach::ServiceDiscoveryOutput'
+    - Property
+    - [Arn, HostedZoneId, Id]
+    - 'ServiceDiscovery${Property}'
+        Value: !GetAtt [!Ref ServiceDiscovery, !Ref Property]
+        Export:
+          Name: !Sub ${System}ServiceDiscovery${Property}
+
+  'Fn::ForEach::AppMeshOutput'
+    - Property
+    - [Arn, MeshName, MeshOwner, ResourceOwner, Uid]
+    - 'Appmesh${Property}'
+        Value: !GetAtt [!Ref Appmesh, !Ref Property]
+        Export:
+          Name: !Sub ${System}Appmesh${Property}
+

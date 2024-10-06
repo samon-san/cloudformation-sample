@@ -1,0 +1,339 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: Create VPC
+
+Parameters:
+  Env: 
+    Description: Environment (dev,stg,prod etc)
+    Type: String
+  System:
+    Description: System ID
+    Type: String
+ 
+  PubSubCidr01:
+    Desciption: Public Subnet Cidr01
+    Type: String
+  PubSubCidr02:
+    Desciption: Public Subnet Cidr02
+    Type: String
+  PriAPSubCidr01:
+    Desciption: Private Application Subnet Cidr01
+    Type: String
+  PriAPSubCidr02:
+    Desciption: Private Application Subnet Cidr02
+    Type: String
+  PriDBSubCidr01:
+    Desciption: Private DB Subnet Cidr01
+    Type: String
+  PriDBSubCidr02:
+    Desciption: Private DB Subnet Cidr02
+    Type: String
+
+Mappings:
+  AzMap:
+    ap-northeast-1:
+      1st: ap-northeast-1c
+      2nd: ap-northeast-1d
+
+#--------------------------------------------------------------------------
+# Resources
+#--------------------------------------------------------------------------
+Resources:
+
+  #--------------------------------------------------------------------------
+  # Subnet
+  #--------------------------------------------------------------------------
+
+  PubSub01:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:  {"Fn::ImportValue": !Sub "${System}VPCId"}
+      CidrBlock: !Ref PubSubCidr01
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 1st]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-pub-sub01
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+  PubSub02:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:  {"Fn::ImportValue": !Sub "${System}VPCId"}
+      CidrBlock: !Ref PubSubCidr02
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 2nd]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-pub-sub02
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+
+  PriAPSub01:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:  {"Fn::ImportValue": !Sub "${System}VPCId"}
+      CidrBlock: !Ref PriAPSubCidr01
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 1st]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-pri-ap-sub01
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+
+  PriAPSub02:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:  {"Fn::ImportValue": !Sub "${System}VPCId"}
+      CidrBlock: !Ref PriAPSubCidr02
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 1st]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-pri-ap-sub02
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+
+  PriDBSub01:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:  {"Fn::ImportValue": !Sub "${System}VPCId"}
+      CidrBlock: !Ref PriDBSubCidr01
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 1st]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-pri-db-sub01
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+  PriDBSub02:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId:  {"Fn::ImportValue": !Sub "${System}VPCId"}
+      CidrBlock: !Ref PriDBSubCidr02
+      AvailabilityZone: !FindInMap [AzMap, !Ref AWS::Region, 1st]
+      MapPublicIpOnLaunch: true
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-pri-db-sub02
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+  #--------------------------------------------------------------------------
+  # Nat Gateway
+  #--------------------------------------------------------------------------
+  
+  EIP01:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-natgateway-eip01
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+  EIP02:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-natgateway-eip02
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+  NatGateway01:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt EIP01.AllocationId
+      SubnetId: !Ref PubSub01
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-natgateway01
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+  NatGateway02:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt EIP01.AllocationId
+      SubnetId: !Ref PubSub01
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-natgateway02
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+  #--------------------------------------------------------------------------
+  # Route Table
+  #--------------------------------------------------------------------------
+
+  PubRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:  {"Fn::ImportValue": !Sub "${System}VPCId"}
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-pub-rt
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+  PriAPRouteTable01:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:  {"Fn::ImportValue": !Sub "${System}VPCId"}
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-pri-ap-rt01
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+  PriAPRouteTable02:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:  {"Fn::ImportValue": !Sub "${System}VPCId"}
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-pri-ap-rt02
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+  PriDBRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId:  {"Fn::ImportValue": !Sub "${System}VPCId"}
+      Tags:
+        - Key: Name
+          Value: !Sub ${Env}-${System}-pri-db-rt
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+PublicGwRoute:
+  Type: AWS::EC2::Route
+  DependOn:
+    - PubRouteTable
+  Properties:
+    RputeTableId: !Ref PubRouteTable
+    DestinationCidrBlock: 0.0.0.0/0
+    GatewayId:  {"Fn::ImportValue": !Sub "${System}InternetGatewayId"}
+
+NatGatewayRoute01:
+  Type: AWS::EC2::Route
+  DependOn:
+    - PriAPRouteTable01
+    - NatGateway01
+  Properties:
+    RputeTableId: !Ref PriAPRouteTable01
+    DestinationCidrBlock: 0.0.0.0/0
+    NatGatewayId: !Ref NatGateway01
+
+NatGatewayRoute02:
+  Type: AWS::EC2::Route
+  DependOn:
+    - PriAPRouteTable02
+    - NatGateway01
+  Properties:
+    RputeTableId: !Ref PriAPRouteTable02
+    DestinationCidrBlock: 0.0.0.0/0
+    NatGatewayId: !Ref NatGateway02
+
+  #--------------------------------------------------------------------------
+  # Route Table Association
+  #--------------------------------------------------------------------------
+
+  PubSubRouteTableAssociation01:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DependsOn:
+      - PubSub01
+      - PriAPRouteTable01
+    Properties:
+      SubnetId: !Ref PubSub01
+      RouteTableId: !Ref PriAPRouteTable01
+
+  PubSubRouteTableAssociation02:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DependsOn:
+      - PubSub01
+      - PriAPRouteTable02
+    Properties:
+      SubnetId: !Ref PubSub02
+      RouteTableId: !Ref PriAPRouteTable02
+
+  PriAPSubRouteTableAssociation01:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DependsOn:
+      - PriAPSub01
+      - PriAPRouteTable
+    Properties:
+      SubnetId: !Ref PriAPSub01
+      RouteTableId: !Ref PubRouteTable
+
+  PriAPSubRouteTableAssociation02:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DependsOn:
+      - PriAPSub02
+      - PriAPRouteTable
+    Properties:
+      SubnetId: !Ref PriAPSub02
+      RouteTableId: !Ref PubRouteTable
+
+  PriDBSubRouteTableAssociation01:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DependsOn:
+      - PriAPSub01
+      - PriDBRouteTable
+    Properties:
+      SubnetId: !Ref PriDBSub01
+      RouteTableId: !Ref PubRouteTable
+
+  PriDBSubRouteTableAssociation02:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    DependsOn:
+      - PriDBSub02
+      - PriDBRouteTable
+    Properties:
+      SubnetId: !Ref PriDBSub02
+      RouteTableId: !Ref PubRouteTable
+
+#--------------------------------------------------------------------------
+# Output
+#--------------------------------------------------------------------------
+
+Outputs:
+
+
+

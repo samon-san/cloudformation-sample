@@ -1,0 +1,29 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: |
+  Backup destination vault
+
+Parameters:
+  Env: 
+    Description: Environment (dev,stg,prod etc)
+    Type: String
+
+  System:
+    Description: System ID
+    Type: String 
+
+
+Resources:
+
+# -------------------------------------------------------- #
+# AWS backup
+# -------------------------------------------------------- #
+
+  BackupBackupVault:
+    Type: AWS::Backup::BackupVault
+    Properties:
+      BackupVaultName: !Sub ${Env}-${System}-backup-vault
+      BackupVaultTags: 
+        Env: !Ref Env
+        System: !Ref System
+        Region: !Ref "AWS::Region"

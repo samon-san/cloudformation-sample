@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::LanguageExtensions
+Description: CloudFormation template for EventBridge backup job failure detection
+
+Parameters:
+  Env: 
+    Description: Environment (dev,stg,prod etc)
+    Type: String
+  System:
+    Description: System ID
+    Type: String 
+
+
+  MailDomain:
+    Description: Domain name of mail address
+    Type: String
+  MailUserList:
+    Description: User name of mail address
+    Type: List<String>
+
+
+#--------------------------------------------------------------------------
+# Resources
+#--------------------------------------------------------------------------
+Resources:
+
+  #--------------------------------------------------------------------------
+  # SNS -Alart 
+  #--------------------------------------------------------------------------
+
+  SNSAlartTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Sub ${Env}-${System}-sns-alart
+      TopicName: !Sub ${Env}-${System}-sns-alart
+      Tags:
+        - Key: Env
+          Value: !Ref Env
+        - Key: System
+          Value: !Ref System
+
+
+  SNSAlartTopicPolicy:
+    Type: AWS::SNS::TopicPolicy
+    Properties:
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: SNSAlart
+            Effect: Allow
+            Principal:
+              Service:
+                - events.amazonaws.com
+                - cloudwatch.amazonaws.com
+            Action:
+              - sns:Publish
+            Resource: !Ref SNSAlartTopic
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Topics:
+        - !Ref SNSAlartTopic
+
+
+  Fn::ForEach::MailAddress:
+    - MailUser
+    - !Ref MailUserList
+    - Topic${MailAddressUser}:
+        Type: AWS::SNS::Subscription
+        Properties:
+          Endpoint: !Sub ${MailUser}@${MailDomain}
+          Protocol: email
+          TopicArn: !Ref SNSAlartTopic
+
+  #--------------------------------------------------------------------------
+  # EventBridge - Backup Failure
+  #--------------------------------------------------------------------------
+
+  EventBridge:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub ${Env}-${System}-backup-job-failure
+      EventPattern: >-
+        {"source":["aws.backup"],"detail-type":["Backup Job State Change"],"detail":{"state":["FAILED"]}}
+      State: ENABLED
+      EventBusName: default
+      Targets:
+        - Id: SNSAlartTopic
+          Arn: !Ref SNSAlartTopic
+
+
+#--------------------------------------------------------------------------
+# Output
+#--------------------------------------------------------------------------
+
+Outputs:
+  SNSAlartTopicArn:
+    Value: !Ref SNSAlartTopic
+    Export:
+      Name: SNSAlartTopic
